@@ -1,0 +1,39 @@
+[package]
+name = "sea-streamer-redis"
+version = "0.5.0"
+authors = ["Chris Tsang <chris.2y3@outlook.com>"]
+edition = "2021"
+description = "🌊 SeaStreamer Redis Backend"
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/sea-streamer-redis"
+repository = "https://github.com/SeaQL/sea-streamer"
+categories = ["concurrency"]
+keywords = ["async", "stream", "redis", "stream-processing"]
+rust-version = "1.60"
+
+[package.metadata.docs.rs]
+features = []
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+
+[dev-dependencies]
+
+[features]
+default = ["runtime-tokio"] # sadly redis does not compile without a runtime
+test = ["anyhow", "async-std?/attributes", "tokio?/full", "env_logger"]
+executables = ["anyhow", "env_logger", "clap", "runtime-tokio", "tokio/full"]
+runtime-async-std = ["async-std", "redis/async-std-comp", "sea-streamer-runtime/runtime-async-std"]
+runtime-tokio = ["tokio", "redis/tokio-comp", "sea-streamer-runtime/runtime-tokio"]
+runtime-async-std-native-tls = ["runtime-async-std", "redis/async-std-native-tls-comp"]
+runtime-tokio-native-tls = ["runtime-tokio", "redis/tokio-native-tls-comp"]
+
+[[bin]]
+name = "consumer"
+path = "src/bin/consumer.rs"
+required-features = ["executables"]
+
+[[bin]]
+name = "producer"
+path = "src/bin/producer.rs"
+required-features = ["executables"]

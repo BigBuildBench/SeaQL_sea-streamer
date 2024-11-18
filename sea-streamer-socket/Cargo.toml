@@ -1,0 +1,33 @@
+[package]
+name = "sea-streamer-socket"
+version = "0.5.1"
+authors = ["Chris Tsang <chris.2y3@outlook.com>"]
+edition = "2021"
+description = "🌊 SeaStreamer backend-agnostic Socket API"
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/sea-streamer-socket"
+repository = "https://github.com/SeaQL/sea-streamer"
+categories = ["concurrency"]
+keywords = ["async", "stream", "kafka", "stream-processing"]
+rust-version = "1.60"
+
+[package.metadata.docs.rs]
+features = ["default"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+
+[features]
+default = ["backend-stdio"] # sadly cannot compile without one backend
+executables = ["anyhow", "env_logger", "clap", "tokio/full", "runtime-tokio"]
+runtime-async-std = ["sea-streamer-kafka?/runtime-async-std", "sea-streamer-redis?/runtime-async-std", "sea-streamer-stdio?/runtime-async-std", "sea-streamer-file?/runtime-async-std"]
+runtime-tokio = ["sea-streamer-kafka?/runtime-tokio", "sea-streamer-redis?/runtime-tokio", "sea-streamer-stdio?/runtime-tokio", "sea-streamer-file?/runtime-tokio"]
+backend-kafka = ["sea-streamer-kafka"]
+backend-redis = ["sea-streamer-redis"]
+backend-stdio = ["sea-streamer-stdio"]
+backend-file = ["sea-streamer-file"]
+
+[[bin]]
+name = "relay"
+path = "src/bin/relay.rs"
+required-features = ["executables"]

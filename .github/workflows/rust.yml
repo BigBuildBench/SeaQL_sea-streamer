@@ -1,0 +1,113 @@
+name: tests
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '.github/ISSUE_TEMPLATE/**'
+  push:
+    paths-ignore:
+      - '**.md'
+      - '.github/ISSUE_TEMPLATE/**'
+    branches:
+      - main
+      - 0.*.x
+      - pr/**/ci
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  test:
+    name: Unit Test, Clippy & Fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo build --all
+      - run: cargo build --manifest-path "sea-streamer-file/Cargo.toml" --features executables
+      - run: cargo test --all
+      - run: cargo test --package sea-streamer-stdio --test '*' --features test -- --nocapture
+      - run: cargo test --package sea-streamer-file --test '*' --features test,runtime-async-std -- --nocapture
+      - run: cargo test --package sea-streamer-file --test '*' --features test,runtime-tokio -- --nocapture
+      - run: cargo clippy --features file,redis,kafka,stdio,socket,json -- -D warnings
+      - run: cargo clippy --all
+
+  kafka:
+    name: Kafka
+    runs-on: ubuntu-latest
+    env:
+      HOST_ID: DUMMY_HOST_ID
+      RUST_LOG: rdkafka=trace
+    strategy:
+      fail-fast: false
+      matrix:
+        kafka_version: [3.3.1, 2.8]
+        runtime: [async-std, tokio]
+    services:
+      zookeeper:
+        image: bitnami/zookeeper:latest
+        ports:
+          - 2181:2181
+        env:
+          ALLOW_ANONYMOUS_LOGIN: yes
+      kafka:
+        image: bitnami/kafka:${{ matrix.kafka_version }}
+        ports:
+          - 9092:9092
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+          KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092
+          KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+          ALLOW_PLAINTEXT_LISTENER: yes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --package sea-streamer-kafka --features test,runtime-${{ matrix.runtime }} -- --nocapture
+
+  redpanda:
+    name: Redpanda
+    runs-on: ubuntu-latest
+    env:
+      HOST_ID: DUMMY_HOST_ID
+      RUST_LOG: rdkafka=trace
+    strategy:
+      fail-fast: false
+      matrix:
+        redpanda_version: [latest]
+        runtime: [async-std, tokio]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: docker run -d -p 9092:9092 -p 9644:9644 redpandadata/redpanda:${{ matrix.redpanda_version }} redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M --node-id 0 --check=false
+      - run: cargo test --package sea-streamer-kafka --features test,runtime-${{ matrix.runtime }} -- --nocapture
+
+  redis:
+    name: Redis
+    runs-on: ubuntu-latest
+    env:
+      HOST_ID: DUMMY_HOST_ID
+    strategy:
+      fail-fast: false
+      matrix:
+        redis_version: [latest]
+        runtime: [async-std, tokio]
+    services:
+      redis:
+        image: redis:${{ matrix.redis_version }}
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --package sea-streamer-redis --no-default-features --features test,runtime-${{ matrix.runtime }} -- --nocapture
